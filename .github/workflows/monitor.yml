@@ -2,14 +2,7 @@ name: 웹 모니터 - 새 게시물 알림
 
 on:
   schedule:
-    # 매 30분마다 실행 (cron 형식: 분 시 일 월 요일)
-    # 변경 예시:
-    #   매 1시간: "0 * * * *"
-    #   매 10분:  "*/10 * * * *"
-    #   평일 9-18시 매 30분: "*/30 9-18 * * 1-5"
     - cron: "*/30 * * * *"
-
-  # 수동 실행 버튼 (Actions 탭에서 직접 실행 가능)
   workflow_dispatch:
 
 jobs:
@@ -17,47 +10,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ① 코드 체크아웃
       - name: 코드 체크아웃
         uses: actions/checkout@v4
 
-      # ② state.json 캐시 복원 (이전 실행 상태 유지)
-      - name: 이전 state 복원
-        uses: actions/cache@v4
-        with:
-          path: state.json
-          key: web-monitor-state-${{ github.ref_name }}
-          restore-keys: web-monitor-state-
-
-      # ③ Python 설치
       - name: Python 설치
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # ④ 의존성 설치
       - name: 패키지 설치
         run: pip install requests beautifulsoup4
 
-      # ⑤ 스크래퍼 실행
       - name: 스크래퍼 실행
         env:
-          # ── 모니터링 대상 ──────────────────────────────
-          TARGET_URL:      ${{ secrets.TARGET_URL }}
-          BASE_URL:        ${{ secrets.BASE_URL }}
-          KEYWORDS:        ${{ secrets.KEYWORDS }}          # 선택사항 (없으면 전체 알림)
-          # ── 이메일 설정 ────────────────────────────────
-          SMTP_HOST:       ${{ secrets.SMTP_HOST }}
-          SMTP_PORT:       ${{ secrets.SMTP_PORT }}
-          SMTP_USER:       ${{ secrets.SMTP_USER }}
-          SMTP_PASS:       ${{ secrets.SMTP_PASS }}
-          NOTIFY_EMAIL:    ${{ secrets.NOTIFY_EMAIL }}
+          TARGET_URL:    ${{ secrets.TARGET_URL }}
+          BASE_URL:      ${{ secrets.BASE_URL }}
+          KEYWORDS:      ${{ secrets.KEYWORDS }}
+          SMTP_HOST:     ${{ secrets.SMTP_HOST }}
+          SMTP_PORT:     ${{ secrets.SMTP_PORT }}
+          SMTP_USER:     ${{ secrets.SMTP_USER }}
+          SMTP_PASS:     ${{ secrets.SMTP_PASS }}
+          NOTIFY_EMAIL:  ${{ secrets.NOTIFY_EMAIL }}
         run: python scripts/scraper.py
 
-      # ⑥ 업데이트된 state.json 저장
-      - name: state 저장
-        uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: state.json
-          key: web-monitor-state-${{ github.ref_name }}-${{ github.run_id }}
+      - name: 상태 저장 (last_seen.txt 커밋)
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add last_seen.txt
+          git diff --staged --quiet || git commit -m "chore: update last_seen"
+          git push
